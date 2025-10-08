@@ -1,3 +1,4 @@
+<!-- templates/admin_dashboard.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,48 +6,34 @@
     <title>Admin Dashboard</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        a.button {
-            display: inline-block;
-            padding: 6px 12px;
-            margin: 4px 0;
-            font-size: 14px;
-            color: white;
-            background-color: #4CAF50;
-            text-decoration: none;
-            border-radius: 4px;
-        }
-        a.button:hover { background-color: #45a049; }
+        h1 { color: #333; }
+        .employee { border: 1px solid #ccc; padding: 10px; margin-bottom: 15px; }
+        .files { margin-left: 20px; }
+        .files a { display: block; margin-bottom: 5px; }
+        .download-btn { margin-top: 10px; display: inline-block; padding: 5px 10px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; }
+        .download-btn:hover { background: #218838; }
     </style>
 </head>
 <body>
-    <h2>Welcome, Admin!</h2>
+    <h1>Welcome, Admin!</h1>
 
     {% if employees %}
-        <table>
-            <tr>
-                <th>Employee Name</th>
-                <th>Files</th>
-                <th>Actions</th>
-            </tr>
-            {% for emp in employees %}
-            <tr>
-                <td>{{ emp.name }}</td>
-                <td>
-                    <ul>
-                    {% for fname, furl in emp.files.items() %}
-                        <li><a href="{{ furl }}" target="_blank">{{ fname }}</a></li>
+        {% for emp in employees %}
+        <div class="employee">
+            <h2>{{ emp.name }}</h2>
+            <div class="files">
+                {% if emp.files %}
+                    <strong>Files:</strong>
+                    {% for file_name, file_link in emp.files.items() %}
+                        <a href="{{ file_link }}" target="_blank">{{ file_name }}</a>
                     {% endfor %}
-                    </ul>
-                </td>
-                <td>
-                    <a href="/download/{{ emp.folder_path }}" class="button">Download Folder</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </table>
+                {% else %}
+                    <em>No files uploaded yet.</em>
+                {% endif %}
+            </div>
+            <a href="/download/{{ emp.name }}" class="download-btn">Download Folder</a>
+        </div>
+        {% endfor %}
     {% else %}
         <p>No employee documents uploaded yet.</p>
     {% endif %}
