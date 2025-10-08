@@ -9,7 +9,9 @@ import os
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-# Cloudinary config
+# ========================
+# Cloudinary Configuration
+# ========================
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
     api_key=os.getenv("CLOUDINARY_API_KEY"),
@@ -66,7 +68,7 @@ async def upload_files(
                 overwrite=True,
                 resource_type="auto"
             )
-            uploaded_links[label] = upload_result["secure_url"]
+            uploaded_links[label] = upload_result.get("secure_url", "❌ No URL returned")
         except Exception as e:
             uploaded_links[label] = f"❌ Failed to upload: {str(e)}"
 
@@ -78,7 +80,7 @@ async def upload_files(
 
 
 # ===========================
-# Admin Portal (Robust)
+# Admin Portal
 # ===========================
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_login(request: Request):
@@ -92,25 +94,31 @@ async def admin_dashboard(request: Request, password: str = Form(...)):
     employees = []
 
     try:
-        # List employee folders; safe if folder missing
-        folders = cloudinary.api.sub_folders("employee_docs").get('folders', [])
-    except Exception:
+        # List employee folders safely
+        folders_resp = cloudinary.api.sub_folders("employee_docs")
+        folders = folders_resp.get('folders', [])
+        print("Folders fetched:", folders)
+    except Exception as e:
+        print("Error fetching folders:", e)
         folders = []
 
     for f in folders:
         folder_path = f.get('path', '')
         file_links = {}
+
         try:
-            # List files inside folder safely
-            resources = cloudinary.api.resources(type="upload", prefix=folder_path).get('resources', [])
+            resources_resp = cloudinary.api.resources(type="upload", prefix=folder_path)
+            resources = resources_resp.get('resources', [])
+            print(f"Resources in {folder_path}:", resources)
             for file in resources:
                 filename = file['public_id'].split('/')[-1]
-                file_links[filename] = file['secure_url']
-        except Exception:
+                file_links[filename] = file.get('secure_url', '#')
+        except Exception as e:
+            print(f"Error fetching resources in {folder_path}:", e)
             file_links = {}
 
         employees.append({
-            "name": folder_path.split('/')[-1],
+            "name": folder_path.split('/')[-1] if folder_path else "Unknown",
             "files": file_links
         })
 
