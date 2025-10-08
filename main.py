@@ -1,4 +1,3 @@
-# main.py
 from fastapi import FastAPI, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
@@ -11,7 +10,7 @@ import zipfile
 import requests
 
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory="templates")  # Make sure templates folder exists
 
 # =================== CLOUDINARY CONFIG ===================
 cloudinary.config(
@@ -23,7 +22,7 @@ cloudinary.config(
 # =================== ADMIN PASSWORD ===================
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
-# =================== EMPLOYEE UPLOAD ===================
+# =========================== EMPLOYEE UPLOAD ===========================
 @app.get("/", response_class=HTMLResponse)
 async def form_page(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -43,6 +42,7 @@ async def upload_files(
 ):
     folder = f"employee_docs/{name}_{aadhar_number}"
 
+    # File renaming
     renamed_files = {
         "Aadhar Card": f"{aadhar_password}_{name}_{aadhar_number}_Aadhar",
         "Your Photo": f"{name}_{aadhar_number}_Photo",
@@ -74,7 +74,7 @@ async def upload_files(
         "uploads": uploaded_links
     })
 
-# =================== ADMIN LOGIN & DASHBOARD ===================
+# =========================== ADMIN PORTAL ===========================
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_login(request: Request):
     return templates.TemplateResponse("admin_login.html", {"request": request, "error": ""})
@@ -84,47 +84,54 @@ async def admin_dashboard(request: Request, password: str = Form(...)):
     if password != ADMIN_PASSWORD:
         return templates.TemplateResponse("admin_login.html", {"request": request, "error": "❌ Wrong password!"})
 
+    # Fetch all files under employee_docs
     try:
-        folders = cloudinary.api.sub_folders("employee_docs")['folders']
+        all_files = cloudinary.api.resources(type="upload", prefix="employee_docs")['resources']
     except Exception:
-        folders = []
+        all_files = []
+
+    # Group files by employee folder
+    folders_dict = {}
+    for file in all_files:
+        parts = file['public_id'].split('/')
+        if len(parts) < 2:
+            continue
+        folder_name = parts[1]  # employee folder
+        if folder_name not in folders_dict:
+            folders_dict[folder_name] = []
+        folders_dict[folder_name].append({
+            "file_name": parts[-1],
+            "url": file['secure_url']
+        })
 
     employees = []
-    for f in folders:
-        folder_path = f['path']
-        try:
-            files = cloudinary.api.resources(type="upload", prefix=folder_path)['resources']
-        except Exception:
-            files = []
-        file_links = {file['public_id'].split('/')[-1]: file['secure_url'] for file in files}
+    for folder, files in folders_dict.items():
         employees.append({
-            "name": folder_path.split('/')[-1],
-            "files": file_links
+            "name": folder,
+            "files": {f['file_name']: f['url'] for f in files}
         })
 
     return templates.TemplateResponse("admin_dashboard.html", {"request": request, "employees": employees})
 
-# =================== BULK DOWNLOAD ===================
+# =========================== DOWNLOAD EMPLOYEE FOLDER AS ZIP ===========================
 @app.get("/download/{employee_folder}")
-async def download_employee_files(employee_folder: str):
+async def download_employee_folder(employee_folder: str):
     try:
-        resources = cloudinary.api.resources(type="upload", prefix=f"employee_docs/{employee_folder}")['resources']
+        all_files = cloudinary.api.resources(type="upload", prefix=f"employee_docs/{employee_folder}")['resources']
     except Exception:
-        resources = []
-
-    if not resources:
-        return {"error": "No files found for this employee."}
+        all_files = []
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w") as zip_file:
-        for file in resources:
+        for file in all_files:
             file_name = file['public_id'].split('/')[-1]
-            r = requests.get(file['secure_url'])
-            zip_file.writestr(file_name, r.content)
+            file_url = file['secure_url']
+            response = requests.get(file_url)
+            zip_file.writestr(file_name, response.content)
 
     zip_buffer.seek(0)
     return StreamingResponse(
         zip_buffer,
-        media_type="application/zip",
+        media_type="application/x-zip-compressed",
         headers={"Content-Disposition": f"attachment; filename={employee_folder}.zip"}
     )
