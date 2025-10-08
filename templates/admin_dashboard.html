@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employer Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-100 p-6">
+
+  <div class="max-w-6xl mx-auto">
+    <h1 class="text-3xl font-bold mb-6 text-indigo-700">👔 Employee Documents</h1>
+
+    {% for employee in employees %}
+      <div class="bg-white shadow-md rounded-lg p-4 mb-4">
+        <h2 class="text-xl font-semibold mb-2">{{ employee.name }}</h2>
+        <ul class="list-disc list-inside text-blue-700">
+          {% for filename, url in employee.files.items() %}
+            <li><a href="{{ url }}" target="_blank" class="underline">{{ filename }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endfor %}
+
+    {% if employees|length == 0 %}
+      <p class="text-gray-700">No employee documents uploaded yet.</p>
+    {% endif %}
+  </div>
+
+</body>
+</html>
