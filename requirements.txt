@@ -1,6 +1,6 @@
 fastapi
 uvicorn
+cloudinary
 jinja2
 python-multipart
-cloudinary
-python-dotenv
+requests
