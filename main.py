@@ -8,7 +8,7 @@ import os
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-# Cloudinary config from Railway environment variables
+# Cloudinary config
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
     api_key=os.getenv("CLOUDINARY_API_KEY"),
@@ -32,32 +32,38 @@ async def upload_files(
     nominee_photo: UploadFile = File(...),
     bank_passbook: UploadFile = File(...)
 ):
-    folder = "employee_docs"
+    # Folder per employee
+    folder = f"employee_docs/{name}_{aadhar_number}"
 
-    # file renaming rules
-    aadhar_name = f"{aadhar_password}_{name}_{aadhar_number}_Aadhar"
-    your_photo_name = f"{name}_{aadhar_number}_Photo"
-    nominee_photo_name = f"{name}_{aadhar_number}_{nominee_relation}"
-    bank_passbook_name = f"{name}_{aadhar_number}_Bank"
+    # File renaming
+    renamed_files = {
+        "Aadhar Card": f"{aadhar_password}_{name}_{aadhar_number}_Aadhar",
+        "Your Photo": f"{name}_{aadhar_number}_Photo",
+        "Nominee Photo": f"{name}_{aadhar_number}_{nominee_relation}",
+        "Bank Passbook": f"{name}_{aadhar_number}_Bank"
+    }
 
-    uploads = {}
+    # Mapping file objects
+    file_objects = {
+        "Aadhar Card": aadhar_card,
+        "Your Photo": your_photo,
+        "Nominee Photo": nominee_photo,
+        "Bank Passbook": bank_passbook
+    }
 
-    def upload_to_cloudinary(file, filename):
-        return cloudinary.uploader.upload(
-            file.file,
+    uploaded_links = {}
+    for label, file_obj in file_objects.items():
+        upload_result = cloudinary.uploader.upload(
+            file_obj.file,
             folder=folder,
-            public_id=filename,
+            public_id=renamed_files[label],
             overwrite=True,
-            resource_type="image"
-        )["secure_url"]
-
-    uploads["Aadhar Card"] = upload_to_cloudinary(aadhar_card, aadhar_name)
-    uploads["Your Photo"] = upload_to_cloudinary(your_photo, your_photo_name)
-    uploads["Nominee Photo"] = upload_to_cloudinary(nominee_photo, nominee_photo_name)
-    uploads["Bank Passbook"] = upload_to_cloudinary(bank_passbook, bank_passbook_name)
+            resource_type="auto"
+        )
+        uploaded_links[label] = upload_result["secure_url"]
 
     return templates.TemplateResponse("index.html", {
         "request": request,
-        "message": "✅ Files uploaded successfully!",
-        "uploads": uploads
+        "message": f"✅ Files uploaded successfully for {name}!",
+        "uploads": uploaded_links
     })
