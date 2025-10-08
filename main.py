@@ -1,47 +1,109 @@
-# main.py
-from fastapi import FastAPI, Request
-from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 import cloudinary
+import cloudinary.uploader
 import cloudinary.api
+import os
 
-# =================== CONFIGURE CLOUDINARY ===================
+app = FastAPI()
+templates = Jinja2Templates(directory="templates")
+
+# Cloudinary config
 cloudinary.config(
-    cloud_name="YOUR_CLOUD_NAME",  # Replace with your Cloudinary cloud name
-    api_key="YOUR_API_KEY",        # Replace with your Cloudinary API key
-    api_secret="YOUR_API_SECRET"   # Replace with your Cloudinary API secret
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET")
 )
 
-# =================== FASTAPI SETUP ===================
-app = FastAPI()
-templates = Jinja2Templates(directory="templates")  # Make sure this folder exists
+# Admin password
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
-# =================== FUNCTION TO FETCH FOLDERS ===================
-def get_cloudinary_folders():
-    try:
-        response = cloudinary.api.folders()  # Fetch all root folders
-        folders = response.get('folders', [])
-        return [f['name'] for f in folders]
-    except cloudinary.api.Error as e:
-        print("Cloudinary API Error:", e)
-        return []
 
-# =================== ADMIN DASHBOARD ROUTE ===================
-@app.get("/admin", response_class=HTMLResponse)
-async def admin_dashboard(request: Request):
-    folders = get_cloudinary_folders()
-    return templates.TemplateResponse("admin_dashboard.html", {
-        "request": request,
-        "username": "Admin",
-        "folders": folders
-    })
-
-# =================== ROOT ROUTE ===================
+# ===========================
+# Employee Upload Portal
+# ===========================
 @app.get("/", response_class=HTMLResponse)
-async def root_dashboard(request: Request):
-    folders = get_cloudinary_folders()
-    return templates.TemplateResponse("admin_dashboard.html", {
+async def form_page(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+@app.post("/upload", response_class=HTMLResponse)
+async def upload_files(
+    request: Request,
+    name: str = Form(...),
+    aadhar_number: str = Form(...),
+    nominee_name: str = Form(...),
+    nominee_relation: str = Form(...),
+    aadhar_password: str = Form(...),
+    aadhar_card: UploadFile = File(...),
+    your_photo: UploadFile = File(...),
+    nominee_photo: UploadFile = File(...),
+    bank_passbook: UploadFile = File(...)
+):
+    folder = f"employee_docs/{name}_{aadhar_number}"
+
+    # File renaming
+    renamed_files = {
+        "Aadhar Card": f"{aadhar_password}_{name}_{aadhar_number}_Aadhar",
+        "Your Photo": f"{name}_{aadhar_number}_Photo",
+        "Nominee Photo": f"{name}_{aadhar_number}_{nominee_relation}",
+        "Bank Passbook": f"{name}_{aadhar_number}_Bank"
+    }
+
+    file_objects = {
+        "Aadhar Card": aadhar_card,
+        "Your Photo": your_photo,
+        "Nominee Photo": nominee_photo,
+        "Bank Passbook": bank_passbook
+    }
+
+    uploaded_links = {}
+    for label, file_obj in file_objects.items():
+        upload_result = cloudinary.uploader.upload(
+            file_obj.file,
+            folder=folder,
+            public_id=renamed_files[label],
+            overwrite=True,
+            resource_type="auto"
+        )
+        uploaded_links[label] = upload_result["secure_url"]
+
+    return templates.TemplateResponse("index.html", {
         "request": request,
-        "username": "Admin",
-        "folders": folders
+        "message": f"✅ Files uploaded successfully for {name}!",
+        "uploads": uploaded_links
     })
+
+
+# ===========================
+# Admin Portal
+# ===========================
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_login(request: Request):
+    return templates.TemplateResponse("admin_login.html", {"request": request, "error": ""})
+
+@app.post("/admin", response_class=HTMLResponse)
+async def admin_dashboard(request: Request, password: str = Form(...)):
+    if password != ADMIN_PASSWORD:
+        return templates.TemplateResponse("admin_login.html", {"request": request, "error": "❌ Wrong password!"})
+
+    # List employee folders from Cloudinary
+    try:
+        folders = cloudinary.api.sub_folders("employee_docs")['folders']
+    except Exception:
+        folders = []
+
+    employees = []
+    for f in folders:
+        folder_path = f['path']
+        try:
+            files = cloudinary.api.resources(type="upload", prefix=folder_path)['resources']
+        except Exception:
+            files = []
+        file_links = {file['public_id'].split('/')[-1]: file['secure_url'] for file in files}
+        employees.append({
+            "name": folder_path.split('/')[-1],
+            "files": file_links
+        })
+
+    return templates.TemplateResponse("admin_dashboard.html", {"request": request, "employees": employees})
