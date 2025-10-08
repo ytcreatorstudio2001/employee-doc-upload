@@ -1,31 +1,54 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Employer Dashboard</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        a.button {
+            display: inline-block;
+            padding: 6px 12px;
+            margin: 4px 0;
+            font-size: 14px;
+            color: white;
+            background-color: #4CAF50;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        a.button:hover { background-color: #45a049; }
+    </style>
 </head>
-<body class="min-h-screen bg-gray-100 p-6">
+<body>
+    <h2>Welcome, Admin!</h2>
 
-  <div class="max-w-6xl mx-auto">
-    <h1 class="text-3xl font-bold mb-6 text-indigo-700">👔 Employee Documents</h1>
-
-    {% for employee in employees %}
-      <div class="bg-white shadow-md rounded-lg p-4 mb-4">
-        <h2 class="text-xl font-semibold mb-2">{{ employee.name }}</h2>
-        <ul class="list-disc list-inside text-blue-700">
-          {% for filename, url in employee.files.items() %}
-            <li><a href="{{ url }}" target="_blank" class="underline">{{ filename }}</a></li>
-          {% endfor %}
-        </ul>
-      </div>
-    {% endfor %}
-
-    {% if employees|length == 0 %}
-      <p class="text-gray-700">No employee documents uploaded yet.</p>
+    {% if employees %}
+        <table>
+            <tr>
+                <th>Employee Name</th>
+                <th>Files</th>
+                <th>Actions</th>
+            </tr>
+            {% for emp in employees %}
+            <tr>
+                <td>{{ emp.name }}</td>
+                <td>
+                    <ul>
+                    {% for fname, furl in emp.files.items() %}
+                        <li><a href="{{ furl }}" target="_blank">{{ fname }}</a></li>
+                    {% endfor %}
+                    </ul>
+                </td>
+                <td>
+                    <a href="/download/{{ emp.folder_path }}" class="button">Download Folder</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>No employee documents uploaded yet.</p>
     {% endif %}
-  </div>
-
 </body>
 </html>
