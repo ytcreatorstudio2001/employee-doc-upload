@@ -1,74 +1,124 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Employee Document Upload</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employee Document Upload</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-blue-400 via-indigo-500 to-purple-600 flex items-center justify-center p-4">
 
-    <div class="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-8 w-full max-w-lg">
-        <h1 class="text-2xl font-bold text-center mb-6 text-indigo-700">📄 Employee Document Upload</h1>
+  <div class="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-8 w-full max-w-lg">
+    <h1 class="text-2xl font-bold text-center mb-6 text-indigo-700">
+      📄 Employee Document Upload
+    </h1>
 
-        {% if message %}
-        <div class="bg-green-100 text-green-800 p-3 rounded mb-4">
-            {{ message }}
+    <div id="message" class="hidden bg-green-100 text-green-800 p-3 rounded mb-4"></div>
+
+    <form id="uploadForm" enctype="multipart/form-data" class="space-y-4">
+      <input type="text" name="name" placeholder="Full Name" class="w-full p-2 border rounded-lg" required>
+      <input type="text" name="aadhar_number" placeholder="Aadhar Number" class="w-full p-2 border rounded-lg" required>
+      <input type="text" name="nominee_name" placeholder="Nominee Name" class="w-full p-2 border rounded-lg" required>
+      
+      <select name="nominee_relation" class="w-full p-2 border rounded-lg" required>
+        <option value="">-- Select Nominee Relation --</option>
+        <option>Father</option>
+        <option>Mother</option>
+        <option>Husband</option>
+        <option>Wife</option>
+      </select>
+
+      <input type="password" name="aadhar_password" placeholder="Aadhar Password" class="w-full p-2 border rounded-lg" required>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label class="block">
+          <span class="text-sm text-gray-600">Aadhar Card</span>
+          <input type="file" name="aadhar_card" class="w-full mt-1" required>
+        </label>
+        <label class="block">
+          <span class="text-sm text-gray-600">Your Photo</span>
+          <input type="file" name="your_photo" class="w-full mt-1" required>
+        </label>
+        <label class="block">
+          <span class="text-sm text-gray-600">Nominee Photo</span>
+          <input type="file" name="nominee_photo" class="w-full mt-1" required>
+        </label>
+        <label class="block">
+          <span class="text-sm text-gray-600">Bank Passbook</span>
+          <input type="file" name="bank_passbook" class="w-full mt-1" required>
+        </label>
+      </div>
+
+      <button id="submitBtn" type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg transition">
+        Upload Files 🚀
+      </button>
+
+      <!-- Progress Bar -->
+      <div id="progressContainer" class="hidden mt-4">
+        <div class="w-full bg-gray-300 rounded-full h-3">
+          <div id="progressBar" class="bg-green-500 h-3 rounded-full transition-all duration-200" style="width: 0%;"></div>
         </div>
-        {% endif %}
+        <p id="progressText" class="text-sm text-center mt-1 text-gray-700">0%</p>
+      </div>
+    </form>
+  </div>
 
-        <form method="post" action="/upload" enctype="multipart/form-data" class="space-y-4">
-            <input type="text" name="name" placeholder="Full Name" class="w-full p-2 border rounded-lg" required>
-            <input type="text" name="aadhar_number" placeholder="Aadhar Number" class="w-full p-2 border rounded-lg" required>
-            <input type="text" name="nominee_name" placeholder="Nominee Name" class="w-full p-2 border rounded-lg" required>
-            
-            <select name="nominee_relation" class="w-full p-2 border rounded-lg" required>
-                <option value="">-- Select Nominee Relation --</option>
-                <option>Father</option>
-                <option>Mother</option>
-                <option>Husband</option>
-                <option>Wife</option>
-            </select>
+  <script>
+    const form = document.getElementById('uploadForm');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const submitBtn = document.getElementById('submitBtn');
+    const messageDiv = document.getElementById('message');
 
-            <input type="password" name="aadhar_password" placeholder="Aadhar Password" class="w-full p-2 border rounded-lg" required>
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label class="block">
-                    <span class="text-sm text-gray-600">Aadhar Card</span>
-                    <input type="file" name="aadhar_card" class="w-full mt-1" required>
-                </label>
+      progressContainer.classList.remove('hidden');
+      progressBar.style.width = '0%';
+      progressText.textContent = '0%';
+      messageDiv.classList.add('hidden');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Uploading... ⏳';
 
-                <label class="block">
-                    <span class="text-sm text-gray-600">Your Photo</span>
-                    <input type="file" name="your_photo" class="w-full mt-1" required>
-                </label>
+      const formData = new FormData(form);
+      const xhr = new XMLHttpRequest();
 
-                <label class="block">
-                    <span class="text-sm text-gray-600">Nominee Photo</span>
-                    <input type="file" name="nominee_photo" class="w-full mt-1" required>
-                </label>
+      xhr.open('POST', '/upload', true);
 
-                <label class="block">
-                    <span class="text-sm text-gray-600">Bank Passbook</span>
-                    <input type="file" name="bank_passbook" class="w-full mt-1" required>
-                </label>
-            </div>
+      // Progress tracking
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          progressBar.style.width = percent + '%';
+          progressText.textContent = percent + '%';
+        }
+      };
 
-            <button class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg transition">
-                Upload Files 🚀
-            </button>
-        </form>
+      xhr.onload = () => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Upload Files 🚀';
+        progressBar.style.width = '100%';
+        progressText.textContent = '100%';
 
-        {% if uploads %}
-        <div class="mt-6 bg-gray-100 rounded-lg p-4">
-            <h2 class="font-semibold mb-2">Uploaded Files:</h2>
-            <ul class="list-disc list-inside text-sm text-blue-700">
-                {% for label, url in uploads.items() %}
-                    <li><a href="{{ url }}" target="_blank" class="underline">{{ label }}</a></li>
-                {% endfor %}
-            </ul>
-        </div>
-        {% endif %}
-    </div>
+        if (xhr.status === 200) {
+          messageDiv.textContent = '✅ Files uploaded successfully!';
+          messageDiv.classList.remove('hidden');
+          form.reset();
+        } else {
+          messageDiv.textContent = '❌ Upload failed. Please try again.';
+          messageDiv.classList.remove('hidden');
+        }
+      };
+
+      xhr.onerror = () => {
+        messageDiv.textContent = '❌ Upload error. Check your network.';
+        messageDiv.classList.remove('hidden');
+      };
+
+      xhr.send(formData);
+    });
+  </script>
+
 </body>
 </html>
