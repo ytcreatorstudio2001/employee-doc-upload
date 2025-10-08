@@ -6,29 +6,20 @@ import cloudinary.uploader
 import cloudinary.api
 import os
 
-# ===========================
-# FASTAPI & TEMPLATES SETUP
-# ===========================
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")  # Ensure this folder exists
+templates = Jinja2Templates(directory="templates")
 
-# ===========================
-# CLOUDINARY CONFIG
-# ===========================
+# =================== CLOUDINARY CONFIG ===================
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
     api_key=os.getenv("CLOUDINARY_API_KEY"),
     api_secret=os.getenv("CLOUDINARY_API_SECRET")
 )
 
-# ===========================
-# ADMIN PASSWORD
-# ===========================
+# =================== ADMIN PASSWORD ===================
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
-# ===========================
-# EMPLOYEE UPLOAD PORTAL
-# ===========================
+# =================== EMPLOYEE UPLOAD PORTAL ===================
 @app.get("/", response_class=HTMLResponse)
 async def form_page(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -46,7 +37,6 @@ async def upload_files(
     nominee_photo: UploadFile = File(...),
     bank_passbook: UploadFile = File(...)
 ):
-    # Folder for this employee
     folder = f"employee_docs/{name}_{aadhar_number}"
 
     # File renaming
@@ -66,17 +56,14 @@ async def upload_files(
 
     uploaded_links = {}
     for label, file_obj in file_objects.items():
-        try:
-            upload_result = cloudinary.uploader.upload(
-                file_obj.file,
-                folder=folder,
-                public_id=renamed_files[label],
-                overwrite=True,
-                resource_type="auto"
-            )
-            uploaded_links[label] = upload_result["secure_url"]
-        except Exception as e:
-            uploaded_links[label] = f"❌ Upload failed: {e}"
+        upload_result = cloudinary.uploader.upload(
+            file_obj.file,
+            folder=folder,
+            public_id=renamed_files[label],
+            overwrite=True,
+            resource_type="auto"
+        )
+        uploaded_links[label] = upload_result["secure_url"]
 
     return templates.TemplateResponse("index.html", {
         "request": request,
@@ -84,40 +71,43 @@ async def upload_files(
         "uploads": uploaded_links
     })
 
-# ===========================
-# ADMIN LOGIN PAGE
-# ===========================
+
+# =================== ADMIN PORTAL ===================
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_login(request: Request):
     return templates.TemplateResponse("admin_login.html", {"request": request, "error": ""})
 
-# ===========================
-# ADMIN DASHBOARD
-# ===========================
 @app.post("/admin", response_class=HTMLResponse)
 async def admin_dashboard(request: Request, password: str = Form(...)):
     if password != ADMIN_PASSWORD:
         return templates.TemplateResponse("admin_login.html", {"request": request, "error": "❌ Wrong password!"})
 
-    # List all employee folders under "employee_docs"
+    # ===================
+    # List employee folders and files
+    # ===================
     try:
-        folders = cloudinary.api.sub_folders("employee_docs").get('folders', [])
+        all_files = cloudinary.api.resources(type="upload", prefix="employee_docs")['resources']
     except Exception:
-        folders = []
+        all_files = []
 
-    employees = []
-    for f in folders:
-        folder_path = f['path']
-        try:
-            files = cloudinary.api.resources(type="upload", prefix=folder_path).get('resources', [])
-        except Exception:
-            files = []
-
-        file_links = {file['public_id'].split('/')[-1]: file['secure_url'] for file in files}
-
-        employees.append({
-            "name": folder_path.split('/')[-1],  # folder name is employee_name_aadhar
-            "files": file_links
+    # Group files by employee folder
+    employees_dict = {}
+    for file in all_files:
+        parts = file['public_id'].split('/')
+        if len(parts) < 2:
+            continue
+        folder_name = parts[1]  # employee_docs/<folder_name>/file
+        if folder_name not in employees_dict:
+            employees_dict[folder_name] = []
+        employees_dict[folder_name].append({
+            "file_name": parts[-1],
+            "url": file['secure_url']
         })
+
+    # Prepare final employees list
+    employees = []
+    for name, files in employees_dict.items():
+        file_links = {f['file_name']: f['url'] for f in files}
+        employees.append({"name": name, "files": file_links})
 
     return templates.TemplateResponse("admin_dashboard.html", {"request": request, "employees": employees})
