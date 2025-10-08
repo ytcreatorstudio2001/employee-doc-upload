@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head><title>{{ folder_name }}</title></head>
+<body>
+<h2>Folder: {{ folder_name }}</h2>
+<ul>
+{% for file in files %}
+    <li>
+        {{ file.name }} -
+        <a href="/download/file/?file_url={{ file.url }}&file_name={{ file.name }}">Download</a>
+    </li>
+{% else %}
+    <li>No files in this folder.</li>
+{% endfor %}
+</ul>
+<a href="/admin">Back to Dashboard</a>
+</body>
+</html>
