@@ -1,80 +1,35 @@
-from fastapi import FastAPI, Request, Form, UploadFile, File
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi import FastAPI, Request, Form
+from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 import cloudinary
-import cloudinary.uploader
 import cloudinary.api
+import cloudinary.uploader
 import os
 import io
 import zipfile
+import requests
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-# =================== CONFIGURE CLOUDINARY ===================
+# Cloudinary config
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
     api_key=os.getenv("CLOUDINARY_API_KEY"),
     api_secret=os.getenv("CLOUDINARY_API_SECRET")
 )
 
+# Admin password
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
-# =================== EMPLOYEE UPLOAD ===================
-@app.get("/", response_class=HTMLResponse)
-async def form_page(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
 
-@app.post("/upload", response_class=HTMLResponse)
-async def upload_files(
-    request: Request,
-    name: str = Form(...),
-    aadhar_number: str = Form(...),
-    nominee_name: str = Form(...),
-    nominee_relation: str = Form(...),
-    aadhar_password: str = Form(...),
-    aadhar_card: UploadFile = File(...),
-    your_photo: UploadFile = File(...),
-    nominee_photo: UploadFile = File(...),
-    bank_passbook: UploadFile = File(...)
-):
-    folder = f"employee_docs/{name}_{aadhar_number}"
-
-    renamed_files = {
-        "Aadhar Card": f"{aadhar_password}_{name}_{aadhar_number}_Aadhar",
-        "Your Photo": f"{name}_{aadhar_number}_Photo",
-        "Nominee Photo": f"{name}_{aadhar_number}_{nominee_relation}",
-        "Bank Passbook": f"{name}_{aadhar_number}_Bank"
-    }
-
-    file_objects = {
-        "Aadhar Card": aadhar_card,
-        "Your Photo": your_photo,
-        "Nominee Photo": nominee_photo,
-        "Bank Passbook": bank_passbook
-    }
-
-    uploaded_links = {}
-    for label, file_obj in file_objects.items():
-        upload_result = cloudinary.uploader.upload(
-            file_obj.file,
-            folder=folder,
-            public_id=renamed_files[label],
-            overwrite=True,
-            resource_type="auto"
-        )
-        uploaded_links[label] = upload_result["secure_url"]
-
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "message": f"✅ Files uploaded successfully for {name}!",
-        "uploads": uploaded_links
-    })
-
-# =================== ADMIN PORTAL ===================
+# ==========================
+# Admin Login Page
+# ==========================
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_login(request: Request):
     return templates.TemplateResponse("admin_login.html", {"request": request, "error": ""})
+
 
 @app.post("/admin", response_class=HTMLResponse)
 async def admin_dashboard(request: Request, password: str = Form(...)):
@@ -83,44 +38,75 @@ async def admin_dashboard(request: Request, password: str = Form(...)):
 
     # Fetch employee folders
     try:
-        folders = cloudinary.api.sub_folders("employee_docs")['folders']
-    except Exception:
-        folders = []
+        folders_data = cloudinary.api.sub_folders("employee_docs")['folders']
+    except cloudinary.api.Error:
+        folders_data = []
 
-    employees = []
-    for f in folders:
-        folder_path = f['path']
-        try:
-            files = cloudinary.api.resources(type="upload", prefix=folder_path, resource_type="auto")['resources']
-        except Exception:
-            files = []
-        file_links = {file['public_id'].split('/')[-1]: file['secure_url'] for file in files}
-        employees.append({
-            "name": folder_path.split('/')[-1],
-            "folder_path": folder_path,
-            "files": file_links
-        })
+    folders = [{"name": f['name'], "path": f['path']} for f in folders_data]
 
-    return templates.TemplateResponse("admin_dashboard.html", {"request": request, "employees": employees})
+    return templates.TemplateResponse("admin_dashboard.html", {"request": request, "folders": folders})
 
-# =================== DOWNLOAD EMPLOYEE FOLDER ===================
-@app.get("/download/{folder_name}")
+
+# ==========================
+# View Folder Files
+# ==========================
+@app.get("/admin/folder/{folder_name}", response_class=HTMLResponse)
+async def view_folder(request: Request, folder_name: str):
+    folder_path = f"employee_docs/{folder_name}"
+    try:
+        resources = cloudinary.api.resources(
+            type="upload",
+            prefix=folder_path,
+            resource_type="auto",
+            max_results=500
+        )['resources']
+    except cloudinary.api.Error:
+        resources = []
+
+    files = [{"name": r['public_id'].split('/')[-1], "url": r['secure_url']} for r in resources]
+
+    return templates.TemplateResponse("folder_view.html", {
+        "request": request,
+        "folder_name": folder_name,
+        "files": files
+    })
+
+
+# ==========================
+# Download Single File
+# ==========================
+@app.get("/download/file/")
+async def download_file(file_url: str, file_name: str):
+    resp = requests.get(file_url)
+    return StreamingResponse(io.BytesIO(resp.content), media_type="application/octet-stream", headers={
+        "Content-Disposition": f"attachment; filename={file_name}"
+    })
+
+
+# ==========================
+# Download Entire Folder as ZIP
+# ==========================
+@app.get("/download/folder/{folder_name}")
 async def download_folder(folder_name: str):
     folder_path = f"employee_docs/{folder_name}"
     try:
-        files = cloudinary.api.resources(type="upload", prefix=folder_path, resource_type="auto")['resources']
-    except Exception:
-        return {"error": "Folder not found or empty."}
+        resources = cloudinary.api.resources(
+            type="upload",
+            prefix=folder_path,
+            resource_type="auto",
+            max_results=500
+        )['resources']
+    except cloudinary.api.Error:
+        resources = []
 
-    # Create zip in memory
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
-        for file in files:
-            # Download file from Cloudinary
-            url = file['secure_url']
-            public_id = file['public_id'].split('/')[-1]
-            file_data = cloudinary.uploader.download(url)
-            zip_file.writestr(public_id, file_data)
+    zip_io = io.BytesIO()
+    with zipfile.ZipFile(zip_io, mode="w") as zf:
+        for r in resources:
+            file_resp = requests.get(r['secure_url'])
+            file_name = r['public_id'].split('/')[-1]
+            zf.writestr(file_name, file_resp.content)
 
-    zip_buffer.seek(0)
-    return FileResponse(zip_buffer, media_type="application/zip", filename=f"{folder_name}.zip")
+    zip_io.seek(0)
+    return StreamingResponse(zip_io, media_type="application/zip", headers={
+        "Content-Disposition": f"attachment; filename={folder_name}.zip"
+    })
