@@ -6,22 +6,28 @@ import cloudinary.uploader
 import cloudinary.api
 import os
 
+# ===========================
+# FASTAPI & TEMPLATES SETUP
+# ===========================
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory="templates")  # Ensure this folder exists
 
-# Cloudinary config
+# ===========================
+# CLOUDINARY CONFIG
+# ===========================
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
     api_key=os.getenv("CLOUDINARY_API_KEY"),
     api_secret=os.getenv("CLOUDINARY_API_SECRET")
 )
 
-# Admin password
+# ===========================
+# ADMIN PASSWORD
+# ===========================
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
-
 # ===========================
-# Employee Upload Portal
+# EMPLOYEE UPLOAD PORTAL
 # ===========================
 @app.get("/", response_class=HTMLResponse)
 async def form_page(request: Request):
@@ -40,6 +46,7 @@ async def upload_files(
     nominee_photo: UploadFile = File(...),
     bank_passbook: UploadFile = File(...)
 ):
+    # Folder for this employee
     folder = f"employee_docs/{name}_{aadhar_number}"
 
     # File renaming
@@ -59,14 +66,17 @@ async def upload_files(
 
     uploaded_links = {}
     for label, file_obj in file_objects.items():
-        upload_result = cloudinary.uploader.upload(
-            file_obj.file,
-            folder=folder,
-            public_id=renamed_files[label],
-            overwrite=True,
-            resource_type="auto"
-        )
-        uploaded_links[label] = upload_result["secure_url"]
+        try:
+            upload_result = cloudinary.uploader.upload(
+                file_obj.file,
+                folder=folder,
+                public_id=renamed_files[label],
+                overwrite=True,
+                resource_type="auto"
+            )
+            uploaded_links[label] = upload_result["secure_url"]
+        except Exception as e:
+            uploaded_links[label] = f"❌ Upload failed: {e}"
 
     return templates.TemplateResponse("index.html", {
         "request": request,
@@ -74,22 +84,24 @@ async def upload_files(
         "uploads": uploaded_links
     })
 
-
 # ===========================
-# Admin Portal
+# ADMIN LOGIN PAGE
 # ===========================
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_login(request: Request):
     return templates.TemplateResponse("admin_login.html", {"request": request, "error": ""})
 
+# ===========================
+# ADMIN DASHBOARD
+# ===========================
 @app.post("/admin", response_class=HTMLResponse)
 async def admin_dashboard(request: Request, password: str = Form(...)):
     if password != ADMIN_PASSWORD:
         return templates.TemplateResponse("admin_login.html", {"request": request, "error": "❌ Wrong password!"})
 
-    # List employee folders from Cloudinary
+    # List all employee folders under "employee_docs"
     try:
-        folders = cloudinary.api.sub_folders("employee_docs")['folders']
+        folders = cloudinary.api.sub_folders("employee_docs").get('folders', [])
     except Exception:
         folders = []
 
@@ -97,12 +109,14 @@ async def admin_dashboard(request: Request, password: str = Form(...)):
     for f in folders:
         folder_path = f['path']
         try:
-            files = cloudinary.api.resources(type="upload", prefix=folder_path)['resources']
+            files = cloudinary.api.resources(type="upload", prefix=folder_path).get('resources', [])
         except Exception:
             files = []
+
         file_links = {file['public_id'].split('/')[-1]: file['secure_url'] for file in files}
+
         employees.append({
-            "name": folder_path.split('/')[-1],
+            "name": folder_path.split('/')[-1],  # folder name is employee_name_aadhar
             "files": file_links
         })
 
