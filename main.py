@@ -42,7 +42,6 @@ async def upload_files(
 ):
     folder = f"employee_docs/{name}_{aadhar_number}"
 
-    # File renaming
     renamed_files = {
         "Aadhar Card": f"{aadhar_password}_{name}_{aadhar_number}_Aadhar",
         "Your Photo": f"{name}_{aadhar_number}_Photo",
@@ -59,14 +58,17 @@ async def upload_files(
 
     uploaded_links = {}
     for label, file_obj in file_objects.items():
-        upload_result = cloudinary.uploader.upload(
-            file_obj.file,
-            folder=folder,
-            public_id=renamed_files[label],
-            overwrite=True,
-            resource_type="auto"
-        )
-        uploaded_links[label] = upload_result["secure_url"]
+        try:
+            upload_result = cloudinary.uploader.upload(
+                file_obj.file,
+                folder=folder,
+                public_id=renamed_files[label],
+                overwrite=True,
+                resource_type="auto"
+            )
+            uploaded_links[label] = upload_result["secure_url"]
+        except Exception as e:
+            uploaded_links[label] = f"❌ Failed to upload: {str(e)}"
 
     return templates.TemplateResponse("index.html", {
         "request": request,
@@ -76,7 +78,7 @@ async def upload_files(
 
 
 # ===========================
-# Admin Portal
+# Admin Portal (Robust)
 # ===========================
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_login(request: Request):
@@ -87,20 +89,26 @@ async def admin_dashboard(request: Request, password: str = Form(...)):
     if password != ADMIN_PASSWORD:
         return templates.TemplateResponse("admin_login.html", {"request": request, "error": "❌ Wrong password!"})
 
-    # List employee folders from Cloudinary
+    employees = []
+
     try:
-        folders = cloudinary.api.sub_folders("employee_docs")['folders']
+        # List employee folders; safe if folder missing
+        folders = cloudinary.api.sub_folders("employee_docs").get('folders', [])
     except Exception:
         folders = []
 
-    employees = []
     for f in folders:
-        folder_path = f['path']
+        folder_path = f.get('path', '')
+        file_links = {}
         try:
-            files = cloudinary.api.resources(type="upload", prefix=folder_path)['resources']
+            # List files inside folder safely
+            resources = cloudinary.api.resources(type="upload", prefix=folder_path).get('resources', [])
+            for file in resources:
+                filename = file['public_id'].split('/')[-1]
+                file_links[filename] = file['secure_url']
         except Exception:
-            files = []
-        file_links = {file['public_id'].split('/')[-1]: file['secure_url'] for file in files}
+            file_links = {}
+
         employees.append({
             "name": folder_path.split('/')[-1],
             "files": file_links
