@@ -7,9 +7,9 @@ import cloudinary.api
 
 # =================== CONFIGURE CLOUDINARY ===================
 cloudinary.config(
-    cloud_name="YOUR_CLOUD_NAME",
-    api_key="YOUR_API_KEY",
-    api_secret="YOUR_API_SECRET"
+    cloud_name="YOUR_CLOUD_NAME",  # Replace with your Cloudinary cloud name
+    api_key="YOUR_API_KEY",        # Replace with your Cloudinary API key
+    api_secret="YOUR_API_SECRET"   # Replace with your Cloudinary API secret
 )
 
 # =================== FASTAPI SETUP ===================
@@ -19,17 +19,27 @@ templates = Jinja2Templates(directory="templates")  # Make sure this folder exis
 # =================== FUNCTION TO FETCH FOLDERS ===================
 def get_cloudinary_folders():
     try:
-        response = cloudinary.api.folders()  # fetch all root folders
+        response = cloudinary.api.folders()  # Fetch all root folders
         folders = response.get('folders', [])
         return [f['name'] for f in folders]
     except cloudinary.api.Error as e:
         print("Cloudinary API Error:", e)
         return []
 
-# =================== DASHBOARD ROUTE ===================
+# =================== ADMIN DASHBOARD ROUTE ===================
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_dashboard(request: Request):
-    folders = get_cloudinary_folders()  # fetch folders
+    folders = get_cloudinary_folders()
+    return templates.TemplateResponse("admin_dashboard.html", {
+        "request": request,
+        "username": "Admin",
+        "folders": folders
+    })
+
+# =================== ROOT ROUTE ===================
+@app.get("/", response_class=HTMLResponse)
+async def root_dashboard(request: Request):
+    folders = get_cloudinary_folders()
     return templates.TemplateResponse("admin_dashboard.html", {
         "request": request,
         "username": "Admin",
