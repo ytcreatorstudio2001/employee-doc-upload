@@ -1,3 +1,4 @@
+# main.py
 from fastapi import FastAPI, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
@@ -10,7 +11,7 @@ import zipfile
 import requests
 
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")  # Make sure templates folder exists
+templates = Jinja2Templates(directory="templates")
 
 # =================== CLOUDINARY CONFIG ===================
 cloudinary.config(
@@ -22,7 +23,9 @@ cloudinary.config(
 # =================== ADMIN PASSWORD ===================
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
-# =========================== EMPLOYEE UPLOAD ===========================
+# ==========================
+# Employee Upload Portal
+# ==========================
 @app.get("/", response_class=HTMLResponse)
 async def form_page(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -74,7 +77,10 @@ async def upload_files(
         "uploads": uploaded_links
     })
 
-# =========================== ADMIN PORTAL ===========================
+
+# ==========================
+# Admin Portal
+# ==========================
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_login(request: Request):
     return templates.TemplateResponse("admin_login.html", {"request": request, "error": ""})
@@ -84,42 +90,39 @@ async def admin_dashboard(request: Request, password: str = Form(...)):
     if password != ADMIN_PASSWORD:
         return templates.TemplateResponse("admin_login.html", {"request": request, "error": "❌ Wrong password!"})
 
-    # Fetch all files under employee_docs
+    # List employee folders from Cloudinary
     try:
-        all_files = cloudinary.api.resources(type="upload", prefix="employee_docs")['resources']
+        folders = cloudinary.api.sub_folders("employee_docs")['folders']
     except Exception:
-        all_files = []
-
-    # Group files by employee folder
-    folders_dict = {}
-    for file in all_files:
-        parts = file['public_id'].split('/')
-        if len(parts) < 2:
-            continue
-        folder_name = parts[1]  # employee folder
-        if folder_name not in folders_dict:
-            folders_dict[folder_name] = []
-        folders_dict[folder_name].append({
-            "file_name": parts[-1],
-            "url": file['secure_url']
-        })
+        folders = []
 
     employees = []
-    for folder, files in folders_dict.items():
+    for f in folders:
+        folder_path = f['path']
+        try:
+            files = cloudinary.api.resources(type="upload", prefix=folder_path)['resources']
+        except Exception:
+            files = []
+        file_links = {file['public_id'].split('/')[-1]: file['secure_url'] for file in files}
         employees.append({
-            "name": folder,
-            "files": {f['file_name']: f['url'] for f in files}
+            "name": folder_path.split('/')[-1],
+            "files": file_links
         })
 
     return templates.TemplateResponse("admin_dashboard.html", {"request": request, "employees": employees})
 
-# =========================== DOWNLOAD EMPLOYEE FOLDER AS ZIP ===========================
-@app.get("/download/{employee_folder}")
+# ==========================
+# Download Folder as ZIP
+# ==========================
+@app.get("/download/{employee_folder:path}")
 async def download_employee_folder(employee_folder: str):
     try:
         all_files = cloudinary.api.resources(type="upload", prefix=f"employee_docs/{employee_folder}")['resources']
     except Exception:
         all_files = []
+
+    if not all_files:
+        return {"detail": "No files found for this employee."}
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w") as zip_file:
