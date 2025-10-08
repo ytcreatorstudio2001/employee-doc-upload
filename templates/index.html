@@ -9,9 +9,7 @@
 <body class="min-h-screen bg-gradient-to-br from-blue-400 via-indigo-500 to-purple-600 flex items-center justify-center p-4">
 
   <div class="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-8 w-full max-w-lg">
-    <h1 class="text-2xl font-bold text-center mb-6 text-indigo-700">
-      📄 Employee Document Upload
-    </h1>
+    <h1 class="text-2xl font-bold text-center mb-6 text-indigo-700">📄 Employee Document Upload</h1>
 
     <div id="message" class="hidden bg-green-100 text-green-800 p-3 rounded mb-4"></div>
 
@@ -53,7 +51,6 @@
         Upload Files 🚀
       </button>
 
-      <!-- Progress Bar -->
       <div id="progressContainer" class="hidden mt-4">
         <div class="w-full bg-gray-300 rounded-full h-3">
           <div id="progressBar" class="bg-green-500 h-3 rounded-full transition-all duration-200" style="width: 0%;"></div>
@@ -61,64 +58,73 @@
         <p id="progressText" class="text-sm text-center mt-1 text-gray-700">0%</p>
       </div>
     </form>
+
+    {% if uploads %}
+      <div class="mt-6 bg-gray-100 rounded-lg p-4">
+        <h2 class="font-semibold mb-2">Uploaded Files:</h2>
+        <ul class="list-disc list-inside text-sm text-blue-700">
+          {% for label, url in uploads.items() %}
+            <li><a href="{{ url }}" target="_blank" class="underline">{{ label }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
   </div>
 
-  <script>
-    const form = document.getElementById('uploadForm');
-    const progressContainer = document.getElementById('progressContainer');
-    const progressBar = document.getElementById('progressBar');
-    const progressText = document.getElementById('progressText');
-    const submitBtn = document.getElementById('submitBtn');
-    const messageDiv = document.getElementById('message');
+<script>
+const form = document.getElementById('uploadForm');
+const progressContainer = document.getElementById('progressContainer');
+const progressBar = document.getElementById('progressBar');
+const progressText = document.getElementById('progressText');
+const submitBtn = document.getElementById('submitBtn');
+const messageDiv = document.getElementById('message');
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
 
-      progressContainer.classList.remove('hidden');
-      progressBar.style.width = '0%';
-      progressText.textContent = '0%';
-      messageDiv.classList.add('hidden');
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Uploading... ⏳';
+  progressContainer.classList.remove('hidden');
+  progressBar.style.width = '0%';
+  progressText.textContent = '0%';
+  messageDiv.classList.add('hidden');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Uploading... ⏳';
 
-      const formData = new FormData(form);
-      const xhr = new XMLHttpRequest();
+  const formData = new FormData(form);
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/upload', true);
 
-      xhr.open('POST', '/upload', true);
+  xhr.upload.onprogress = (event) => {
+    if (event.lengthComputable) {
+      const percent = Math.round((event.loaded / event.total) * 100);
+      progressBar.style.width = percent + '%';
+      progressText.textContent = percent + '%';
+    }
+  };
 
-      // Progress tracking
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const percent = Math.round((event.loaded / event.total) * 100);
-          progressBar.style.width = percent + '%';
-          progressText.textContent = percent + '%';
-        }
-      };
+  xhr.onload = () => {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Upload Files 🚀';
+    progressBar.style.width = '100%';
+    progressText.textContent = '100%';
 
-      xhr.onload = () => {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Upload Files 🚀';
-        progressBar.style.width = '100%';
-        progressText.textContent = '100%';
+    if (xhr.status === 200) {
+      messageDiv.textContent = '✅ Files uploaded successfully!';
+      messageDiv.classList.remove('hidden');
+      form.reset();
+    } else {
+      messageDiv.textContent = '❌ Upload failed. Please try again.';
+      messageDiv.classList.remove('hidden');
+    }
+  };
 
-        if (xhr.status === 200) {
-          messageDiv.textContent = '✅ Files uploaded successfully!';
-          messageDiv.classList.remove('hidden');
-          form.reset();
-        } else {
-          messageDiv.textContent = '❌ Upload failed. Please try again.';
-          messageDiv.classList.remove('hidden');
-        }
-      };
+  xhr.onerror = () => {
+    messageDiv.textContent = '❌ Upload error. Check your network.';
+    messageDiv.classList.remove('hidden');
+  };
 
-      xhr.onerror = () => {
-        messageDiv.textContent = '❌ Upload error. Check your network.';
-        messageDiv.classList.remove('hidden');
-      };
-
-      xhr.send(formData);
-    });
-  </script>
+  xhr.send(formData);
+});
+</script>
 
 </body>
 </html>
