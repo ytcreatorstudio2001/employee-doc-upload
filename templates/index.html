@@ -1,74 +1,74 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Employee Document Upload</title>
-  <style>
-    body { font-family: Arial; background: #f8f9fa; padding: 20px; }
-    form { background: white; padding: 20px; border-radius: 8px; max-width: 500px; margin: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-    h2 { text-align: center; color: #007bff; }
-    label { display: block; margin-top: 10px; font-weight: bold; }
-    input, select { width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; border: 1px solid #ccc; }
-    button { margin-top: 15px; padding: 10px; width: 100%; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-    button:hover { background: #0056b3; }
-    .msg { text-align: center; color: green; font-weight: bold; margin-top: 10px; }
-    ul { list-style: none; padding: 0; }
-    li { margin: 5px 0; }
-    a { color: #007bff; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Document Upload</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <form action="/submit" enctype="multipart/form-data" method="post">
-    <h2>Employee Document Upload</h2>
+<body class="min-h-screen bg-gradient-to-br from-blue-400 via-indigo-500 to-purple-600 flex items-center justify-center p-4">
 
-    <label>Name</label>
-    <input type="text" name="name" required>
+    <div class="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-8 w-full max-w-lg">
+        <h1 class="text-2xl font-bold text-center mb-6 text-indigo-700">📄 Employee Document Upload</h1>
 
-    <label>Aadhar Number</label>
-    <input type="text" name="aadhar_number" required>
+        {% if message %}
+        <div class="bg-green-100 text-green-800 p-3 rounded mb-4">
+            {{ message }}
+        </div>
+        {% endif %}
 
-    <label>Nominee Name</label>
-    <input type="text" name="nominee_name" required>
+        <form method="post" action="/upload" enctype="multipart/form-data" class="space-y-4">
+            <input type="text" name="name" placeholder="Full Name" class="w-full p-2 border rounded-lg" required>
+            <input type="text" name="aadhar_number" placeholder="Aadhar Number" class="w-full p-2 border rounded-lg" required>
+            <input type="text" name="nominee_name" placeholder="Nominee Name" class="w-full p-2 border rounded-lg" required>
+            
+            <select name="nominee_relation" class="w-full p-2 border rounded-lg" required>
+                <option value="">-- Select Nominee Relation --</option>
+                <option>Father</option>
+                <option>Mother</option>
+                <option>Husband</option>
+                <option>Wife</option>
+            </select>
 
-    <label>Nominee Relation</label>
-    <select name="nominee_relation" required>
-      <option value="">--Select--</option>
-      <option value="Father">Father</option>
-      <option value="Mother">Mother</option>
-      <option value="Husband">Husband</option>
-      <option value="Wife">Wife</option>
-    </select>
+            <input type="password" name="aadhar_password" placeholder="Aadhar Password" class="w-full p-2 border rounded-lg" required>
 
-    <label>Aadhar Password</label>
-    <input type="password" name="aadhar_password" required>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label class="block">
+                    <span class="text-sm text-gray-600">Aadhar Card</span>
+                    <input type="file" name="aadhar_card" class="w-full mt-1" required>
+                </label>
 
-    <label>Aadhar Card</label>
-    <input type="file" name="aadhar_card" accept=".jpg,.jpeg,.png,.pdf" required>
+                <label class="block">
+                    <span class="text-sm text-gray-600">Your Photo</span>
+                    <input type="file" name="your_photo" class="w-full mt-1" required>
+                </label>
 
-    <label>Your Photo</label>
-    <input type="file" name="your_photo" accept=".jpg,.jpeg,.png" required>
+                <label class="block">
+                    <span class="text-sm text-gray-600">Nominee Photo</span>
+                    <input type="file" name="nominee_photo" class="w-full mt-1" required>
+                </label>
 
-    <label>Nominee Photo</label>
-    <input type="file" name="nominee_photo" accept=".jpg,.jpeg,.png" required>
+                <label class="block">
+                    <span class="text-sm text-gray-600">Bank Passbook</span>
+                    <input type="file" name="bank_passbook" class="w-full mt-1" required>
+                </label>
+            </div>
 
-    <label>Bank Passbook</label>
-    <input type="file" name="bank_passbook" accept=".jpg,.jpeg,.png" required>
+            <button class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg transition">
+                Upload Files 🚀
+            </button>
+        </form>
 
-    <button type="submit">Upload</button>
-
-    {% if message %}
-    <div class="msg">{{ message }}</div>
-    {% endif %}
-
-    {% if urls %}
-      <h3>Uploaded File Links:</h3>
-      <ul>
-      {% for name, link in urls.items() %}
-        <li><a href="{{ link }}" target="_blank">{{ name }}</a></li>
-      {% endfor %}
-      </ul>
-    {% endif %}
-  </form>
+        {% if uploads %}
+        <div class="mt-6 bg-gray-100 rounded-lg p-4">
+            <h2 class="font-semibold mb-2">Uploaded Files:</h2>
+            <ul class="list-disc list-inside text-sm text-blue-700">
+                {% for label, url in uploads.items() %}
+                    <li><a href="{{ url }}" target="_blank" class="underline">{{ label }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
 </body>
 </html>
